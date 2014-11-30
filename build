@@ -1,0 +1,15 @@
+#!/bin/bash -e
+# Setup golang, compile mysql_probe for local system. Based on coreos pattern.
+
+ORG_PATH="github.com/dvolker"
+REPO_PATH="${ORG_PATH}/mysql_probe"
+
+export GOPATH=${PWD}/gopath
+
+rm -f $GOPATH/src/${REPO_PATH}
+mkdir -p $GOPATH/src/${ORG_PATH}
+ln -s ${PWD} $GOPATH/src/${REPO_PATH}
+
+eval $(go env)
+
+go build -o bin/mysql_probe ${REPO_PATH}
