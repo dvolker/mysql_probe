@@ -12,4 +12,6 @@ ln -s ${PWD} $GOPATH/src/${REPO_PATH}
 
 eval $(go env)
 
+go get github.com/codegangsta/cli
+go get github.com/go-sql-driver/mysql
 go build -o bin/mysql_probe ${REPO_PATH}
