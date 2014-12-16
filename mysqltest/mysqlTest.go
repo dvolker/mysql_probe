@@ -66,6 +66,17 @@ func (t *MysqlTest) RunOnce() {
     return
   }
   t.WriteResult("connect", true, fmt.Sprintf("connect took %s", dur.String()))
+
+  start = time.Now()
+  count, err := t.CountConnections()
+  if err != nil {
+    t.WriteResult("connection_count", false, err.Error())
+    return
+  }
+  result := fmt.Sprintf("Process count %d", count)
+  // TODO: check connection count and pass only if below threshold.
+  t.WriteResult("connection_count", true, result)
+  fmt.Println(result)
 	defer t.Disconnect()
 }
 
@@ -94,6 +105,29 @@ func (t *MysqlTest) WriteResult(testname string, passed bool, description string
 
   file.WriteString(response)
 }
+
+func (t *MysqlTest) ReplicationDelay() (int64, error) {
+  // TODO: fix this to check replication delay
+  row := t.db.QueryRow("SHOW SLAVE STATUS") // don't see this in INFORMATION_SCHEMA anywhere
+  var processcount int64
+  err := row.Scan(&processcount)
+  if err != nil {
+    return -1, err
+  }
+  return processcount, nil
+}
+
+
+func (t *MysqlTest) CountConnections() (int64, error) {
+  row := t.db.QueryRow("SELECT count(*) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER != 'system user' AND USER != 'mysql_probe'")
+  var processcount int64
+  err := row.Scan(&processcount)
+  if err != nil {
+    return -1, err
+  }
+  return processcount, nil
+}
+
 func (t *MysqlTest) Connect() (error) {
 	fmt.Println("Host: ", t.host, " Port: ", t.port, " User: ", t.user, " Pass: ", t.pass)
 
@@ -113,7 +147,6 @@ func (t *MysqlTest) Connect() (error) {
 	if err != nil {
     return err
 	}
-	defer db.Close()
 
 	fmt.Println("SUCCESS")
 	t.db = db
