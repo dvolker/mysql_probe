@@ -20,13 +20,14 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
-	//"os"
+	"os"
 	"time"
+  "path/filepath"
 )
 
 type MysqlTest struct {
 	Name     string
-	filename string
+	filedirectory string
 	host     string
 	user     string
 	port     int
@@ -36,8 +37,8 @@ type MysqlTest struct {
 	db       *sql.DB
 }
 
-func NewMysqlTest(name string, host string, port int, user string, pass string, interval int, timeout int, filename string) *MysqlTest {
-	m := MysqlTest{Name: name, host: host, port: port, user: user, pass: pass, interval: interval, timeout: timeout, filename: filename}
+func NewMysqlTest(name string, host string, port int, user string, pass string, interval int, timeout int, filedirectory string) *MysqlTest {
+	m := MysqlTest{Name: name, host: host, port: port, user: user, pass: pass, interval: interval, timeout: timeout, filedirectory: filedirectory}
 	return &m
 }
 
@@ -52,20 +53,41 @@ func (t *MysqlTest) Run() {
 	}
 }
 
-// func writeHttpResult(filename string) {
+// func writeHttpResult(filedirectory string) {
 //
 // }
 func (t *MysqlTest) RunOnce() {
-	t.Connect()
+	err := t.Connect()
+  if (err != nil) {
+    t.WriteResult("connect", false, err.Error())
+  }
 	defer t.Disconnect()
 }
 
 func (t *MysqlTest) Disconnect() {
 	fmt.Println("Disconnecting")
-	t.db.Close()
+  if (t.db != nil) {
+    t.db.Close()
+  }
 }
 
-func (t *MysqlTest) Connect() {
+func (t *MysqlTest) WriteResult(testname string, passed bool, description string) {
+  file, err := os.OpenFile(fmt.Sprintf("%s.txt", filepath.Join(t.filedirectory, "/", testname)),
+      os.O_WRONLY | os.O_CREATE | os.O_TRUNC | os.O_EXCL, 0644)
+  if err != nil {
+    //log.Fatal(err)
+    panic(err.Error())
+  }
+  defer file.Close()
+
+  status := 500
+  if (passed) {
+    status = 200
+  }
+
+  file.WriteString(fmt.Sprintf("HTTP/1.1 %d\r\n\r\n%s", status, description))
+}
+func (t *MysqlTest) Connect() (error) {
 	fmt.Println("Host: ", t.host, " Port: ", t.port, " User: ", t.user, " Pass: ", t.pass)
 
 	// Create dsn like such https://github.com/Go-SQL-Driver/MySQL/#dsn-data-source-name
@@ -76,16 +98,17 @@ func (t *MysqlTest) Connect() {
 
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
-		panic(err.Error())
+    return err
 	}
-	defer db.Close()
 
 	// Open doesn't open a connection. Validate DSN data:
 	err = db.Ping()
 	if err != nil {
-		panic(err.Error()) // proper error handling instead of panic in your app
+    return err
 	}
+	defer db.Close()
 
 	fmt.Println("SUCCESS")
 	t.db = db
+  return nil
 }

@@ -69,7 +69,7 @@ func main() {
 	app.EnableBashCompletion = true
 	app.Action = func(c *cli.Context) {
 		// setup checks to run on intervals
-		t := mysqltest.NewMysqlTest("connection", c.String("host"), c.Int("port"), c.String("user"), c.String("pass"), c.Int("interval"), c.Int("timeout"), "results.txt")
+		t := mysqltest.NewMysqlTest("connection", c.String("host"), c.Int("port"), c.String("user"), c.String("pass"), c.Int("interval"), c.Int("timeout"), "tmp")
 		t.Run()
 	}
 	app.Run(os.Args)
