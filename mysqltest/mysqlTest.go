@@ -23,6 +23,7 @@ import (
 	"os"
 	"time"
   "path/filepath"
+  "log"
 )
 
 type MysqlTest struct {
@@ -57,10 +58,14 @@ func (t *MysqlTest) Run() {
 //
 // }
 func (t *MysqlTest) RunOnce() {
+  start := time.Now()
 	err := t.Connect()
+  dur := time.Since(start)
   if (err != nil) {
     t.WriteResult("connect", false, err.Error())
+    return
   }
+  t.WriteResult("connect", true, fmt.Sprintf("connect took %s", dur.String()))
 	defer t.Disconnect()
 }
 
@@ -72,20 +77,22 @@ func (t *MysqlTest) Disconnect() {
 }
 
 func (t *MysqlTest) WriteResult(testname string, passed bool, description string) {
+  status := "500 Internal Server Error"
+  if (passed) {
+    status = "200 OK"
+  }
+  now := time.Now().Format(time.RFC1123Z)
+  response := fmt.Sprintf("HTTP/1.1 %s\r\nDate: %s\r\nContent-Type: text/plain\r\n\r\n%s\r\n", status, now,  description)
+
   file, err := os.OpenFile(fmt.Sprintf("%s.txt", filepath.Join(t.filedirectory, "/", testname)),
-      os.O_WRONLY | os.O_CREATE | os.O_TRUNC | os.O_EXCL, 0644)
+      os.O_WRONLY | os.O_CREATE | os.O_TRUNC, 0644)
   if err != nil {
     //log.Fatal(err)
-    panic(err.Error())
+    log.Print(err.Error())
   }
   defer file.Close()
 
-  status := 500
-  if (passed) {
-    status = 200
-  }
-
-  file.WriteString(fmt.Sprintf("HTTP/1.1 %d\r\n\r\n%s", status, description))
+  file.WriteString(response)
 }
 func (t *MysqlTest) Connect() (error) {
 	fmt.Println("Host: ", t.host, " Port: ", t.port, " User: ", t.user, " Pass: ", t.pass)
@@ -93,7 +100,7 @@ func (t *MysqlTest) Connect() (error) {
 	// Create dsn like such https://github.com/Go-SQL-Driver/MySQL/#dsn-data-source-name
 	// [username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]
 	// username:password@protocol(address)/dbname?param=value
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%dms", t.user, t.pass, t.host, t.port, t.timeout)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%dms&allowOldPasswords=1", t.user, t.pass, t.host, t.port, t.timeout)
 	fmt.Println("DSN: ", dsn)
 
 	db, err := sql.Open("mysql", dsn)

@@ -4,7 +4,16 @@ golang application that checks a mysql database and creates a series of HTTP res
 flat text files that xinetd can return quickly for haproxy health checks.
 
 ## Installation
-Install golang 1.3+ and run ./build
+Install golang 1.3+ and run ./build which will compile to bin/mysql_probe.
+
+### MySQL configuration
+A user must be created with the following perms:
+PROCESS
+REPLICATION CLIENT
+like such:
+CREATE USER mysql_probe@'%' IDENTIFIED BY 'As92rj05UvKK';
+GRANT PROCESS,REPLICATION CLIENT ON *.* TO mysql_probe@'%';
+
 
 ## Create package for distribution
 Install fpm and run ./package https://github.com/jordansissel/fpm
