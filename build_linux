@@ -1,0 +1,4 @@
+#!/bin/bash -e
+# Setup golang, compile mysql_probe for local system. Based on coreos pattern.
+
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 ./build

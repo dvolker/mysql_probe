@@ -44,13 +44,16 @@ func NewMysqlTest(name string, host string, port int, user string, pass string, 
 }
 
 func (t *MysqlTest) Run() {
-	if t.interval <= 0 {
-		panic("interval must be a positive integer")
+	if t.interval < 0 {
+		panic("interval must be a positive integer or 0 to run the tests only once.")
 	}
-	// run checks on intervals
-	for _ = range time.Tick(time.Duration(t.interval) * time.Millisecond) {
-		// TODO: expire a test with a timeout
-		t.RunOnce()
+	t.RunOnce() // Run first test instantly.
+	if t.interval > 0 {
+		// run checks on intervals
+		for _ = range time.Tick(time.Duration(t.interval) * time.Millisecond) {
+			// TODO: expire a test with a timeout
+			t.RunOnce()
+		}
 	}
 }
 
@@ -78,7 +81,14 @@ func (t *MysqlTest) RunOnce() {
 	t.WriteResult("connection_count", true, result)
 	fmt.Println(result)
 
-	_, _, err = t.CheckReplication()
+	delay, description, err := t.CheckReplication()
+	if err != nil {
+		t.WriteResult("replication", false, fmt.Sprintf("%s: %s", description, err.Error()))
+	} else {
+		for _, seconds := range []int64{0, 10, 30, 60, 120, 300, 600, 1200, 2400} {
+			t.WriteResult(fmt.Sprintf("replication_delay_lte_%d", seconds), (delay <= seconds), fmt.Sprintf("Replication delay test (%d delay <= %d seconds)? : %s", delay, seconds, description))
+		}
+	}
 	defer t.Disconnect()
 }
 
@@ -108,6 +118,7 @@ func (t *MysqlTest) WriteResult(testname string, passed bool, description string
 	file.WriteString(response)
 }
 
+// NOTE: only works if one master
 func (t *MysqlTest) CheckReplication() (int64, string, error) {
 	rows, err := t.db.Query("SHOW SLAVE STATUS") // queryable from PERFORMANCE_SCHEMA at mysql 5.7.2: http://bugs.mysql.com/bug.php?id=35994
 	if err != nil {
@@ -146,7 +157,7 @@ func (t *MysqlTest) CheckReplication() (int64, string, error) {
 }
 
 func (t *MysqlTest) CountConnections() (int64, error) {
-	row := t.db.QueryRow("SELECT count(*) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER != 'system user' AND USER != 'mysql_probe'")
+	row := t.db.QueryRow("SELECT count(*) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER != 'system user' AND USER != ?", t.user)
 	var processcount int64
 	err := row.Scan(&processcount)
 	if err != nil {

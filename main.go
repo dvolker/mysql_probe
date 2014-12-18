@@ -56,7 +56,7 @@ func main() {
 		cli.IntFlag{
 			Name:   "interval, i",
 			Value:  250,
-			Usage:  "interval in milliseconds to run the checks",
+			Usage:  "interval in milliseconds to run the checks, set to 0 to only run the tests once",
 			EnvVar: "MYSQL_PROBE_INTERVAL",
 		},
 		cli.IntFlag{
