@@ -16,3 +16,5 @@ eval $(go env)
 go get github.com/codegangsta/cli
 go get github.com/go-sql-driver/mysql
 go build -o bin/mysql_probe ${REPO_PATH}
+echo -n "built bin/mysql_probe: "
+shasum bin/mysql_probe
