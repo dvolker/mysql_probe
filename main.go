@@ -17,17 +17,21 @@
 package main
 
 import (
+	"fmt"
 	"github.com/codegangsta/cli"
 	"github.com/dvolker/mysql_probe/mysqltest"
 	_ "github.com/go-sql-driver/mysql"
 	"os"
 )
 
+const VERSION string = "0.0.2"
+
 func main() {
 	// TODO: parse flags
 	app := cli.NewApp()
 	app.Name = "mysql_probe"
 	app.Usage = "test mysql health and write out http txt responses"
+	app.Version = VERSION
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:   "host",
@@ -53,6 +57,18 @@ func main() {
 			Usage:  "mysql password to connect with",
 			EnvVar: "MYSQL_PROBE_PASS",
 		},
+		cli.StringFlag{
+			Name:   "jsonlog",
+			Value:  "/dev/stdout",
+			Usage:  "file to log output in json",
+			EnvVar: "MYSQL_PROBE_JSONLOG",
+		},
+		cli.StringFlag{
+			Name:   "reports",
+			Value:  "tmp",
+			Usage:  "directory to write reports to",
+			EnvVar: "MYSQL_PROBE_REPORTS",
+		},
 		cli.IntFlag{
 			Name:   "interval, i",
 			Value:  250,
@@ -69,7 +85,13 @@ func main() {
 	app.EnableBashCompletion = true
 	app.Action = func(c *cli.Context) {
 		// setup checks to run on intervals
-		t := mysqltest.NewMysqlTest("connection", c.String("host"), c.Int("port"), c.String("user"), c.String("pass"), c.Int("interval"), c.Int("timeout"), "tmp")
+
+		file, err := os.OpenFile(c.String("jsonlog"), os.O_WRONLY|os.O_CREATE, 0644)
+		if err != nil {
+			panic(fmt.Sprintf("Couldn't open jsonlog \"%s\" for writing: %s", c.String("jsonlog"), err.Error()))
+		}
+		defer file.Close()
+		t := mysqltest.NewMysqlTest("connection", c.String("host"), c.Int("port"), c.String("user"), c.String("pass"), c.Int("interval"), c.Int("timeout"), c.String("reports"), file)
 		t.Run()
 	}
 	app.Run(os.Args)
