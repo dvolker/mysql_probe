@@ -30,6 +30,9 @@ import (
 	"time"
 )
 
+var counts_to_check = []int64{1, 10, 50, 100, 150, 200, 250, 300, 600, 1200, 2400}
+var seconds_to_check = []int64{0, 10, 30, 60, 120, 300, 600, 1200, 2400}
+
 type MysqlTest struct {
 	Name          string
 	filedirectory string
@@ -45,6 +48,7 @@ type MysqlTest struct {
 	maxjobs       uint
 }
 
+
 func NewMysqlTest(name string, host string, port int, user string, pass string, interval int, timeout int, filedirectory string, jsonlog *os.File) *MysqlTest {
 	m := MysqlTest{Name: name, host: host, port: port, user: user, pass: pass, interval: interval, timeout: timeout, filedirectory: filedirectory, jsonlog: jsonlog, iteration: 1}
 
@@ -55,15 +59,22 @@ func (t *MysqlTest) Run() {
 	if t.interval < 0 {
 		panic("interval must be a positive integer, or 0 to run the tests only once.")
 	}
-	t.RunOnce() // Run first test instantly.
+	t.WriteResult(t.RunOnceWithTimeout()) // Run first test instantly.
 	if t.interval > 0 {
 		// run checks on intervals
 		for _ = range time.Tick(time.Duration(t.interval) * time.Millisecond) {
-			// TODO: expire a test with a timeout
 			t.iteration++ // when this overflows it will become 0 with no problems http://play.golang.org/p/fbjwHKcIaU
-			t.RunOnce()
+			t.WriteResult(t.RunOnceWithTimeout())
 		}
 	}
+}
+
+
+// takes the MysqlTestResult and writes corresponding files
+func (t *MysqlTest) WriteResult(res * MysqlTestResult) {
+  for k,v := range res.Entries {
+    t.WriteTextResult(k,v)
+  }
 }
 
 // This is a very dumb json func. If more interesting stuff needs to be logged,
@@ -90,50 +101,80 @@ func (t *MysqlTest) GetWeight(val int64, max int64) string {
 // func writeHttpResult(filedirectory string) {
 //
 // }
-func (t *MysqlTest) RunOnce() {
+
+func (t *MysqlTest) RunOnceWithTimeout() *MysqlTestResult {
+  timeout_ch := make(chan *MysqlTestResult, 1)
+  ch := make(chan *MysqlTestResult, 1)
+
+  // after 1 second, fill a blank response and 
+  // send that indicates everything timed out
+  go func() {
+    time.Sleep(time.Duration(t.timeout) * time.Millisecond)
+    // fill timeout statuses up
+    res := MysqlTestResult{}
+    res.AddTextResult("connect", "down # timeout")
+    for _,c := range counts_to_check {
+      res.AddTextResult(fmt.Sprintf("connection_count_lte_%d", c), "down # timeout")
+    }
+    for _,c := range seconds_to_check {
+       res.AddTextResult(fmt.Sprintf("replication_delay_lte_%d", c), "down # timeout")
+    }
+    timeout_ch <- &res
+  }()
+
+  // run the actual check with no delay
+  // hopefully it wins.
+  go func() {
+    res := t.RunOnce()
+    ch <- res
+  }()
+
+  var res * MysqlTestResult
+  // grab the first thing that comes back
+  select {
+  case res = <-ch:
+  case res = <-timeout_ch:
+  }
+  return res
+}
+
+func (t *MysqlTest) RunOnce() *MysqlTestResult {
+        res := MysqlTestResult{}
 	start := time.Now()
 	err := t.Connect()
 	dur := time.Since(start)
 	if err != nil {
-		//t.WriteResult("connect", false, err.Error())
-		t.WriteTextResult("connect", fmt.Sprintf("down # %s", err.Error()))
+		res.AddTextResult("connect", fmt.Sprintf("down # %s", err.Error()))
 	} else {
-		t.WriteTextResult("connect", fmt.Sprintf("up 100%% # connect took %s", dur.String()))
+		res.AddTextResult("connect", fmt.Sprintf("up 100%% # connect took %s", dur.String()))
 	}
 
 	start = time.Now()
 	count, err := t.CountConnections()
-	counts_to_check := []int64{1, 10, 50, 100, 150, 200, 250, 300, 600, 1200, 2400}
 	if err != nil {
 		description := fmt.Sprintf("Connection count check failed: %s", err.Error())
 		for _, connections := range counts_to_check {
-			//t.WriteResult(fmt.Sprintf("connection_count_lte_%d", connections), false, fmt.Sprintf("Connection count test (%d connections <= %d)? : %s", count, connections, description))
-			t.WriteTextResult(fmt.Sprintf("connection_count_lte_%d", connections), fmt.Sprintf("down # Connection count test (%d connections <= %d)? : %s", count, connections, description))
+			res.AddTextResult(fmt.Sprintf("connection_count_lte_%d", connections), fmt.Sprintf("down # Connection count test (%d connections <= %d)? : %s", count, connections, description))
 		}
 	} else {
 		description := fmt.Sprintf("Connection count is %d", count)
 		for _, connections := range counts_to_check {
-			//t.WriteResult(fmt.Sprintf("connection_count_lte_%d", connections), (count <= connections), fmt.Sprintf("Connection count test (%d connections <= %d)? : %s", count, connections, description))
 			var status string
 			if count <= connections {
 				status = fmt.Sprintf("up %s", t.GetWeight(count, connections))
 			} else {
 				status = "down"
 			}
-			t.WriteTextResult(fmt.Sprintf("connection_count_lte_%d", connections), fmt.Sprintf("%s # Connection count test (%d connections <= %d)? : %s", status, count, connections, description))
+			res.AddTextResult(fmt.Sprintf("connection_count_lte_%d", connections), fmt.Sprintf("%s # Connection count test (%d connections <= %d)? : %s", status, count, connections, description))
 		}
 	}
 
-	seconds_to_check := []int64{0, 10, 30, 60, 120, 300, 600, 1200, 2400}
 	delay, description, err := t.CheckReplication()
 	if err != nil {
 		description = fmt.Sprintf("%s: %s", description, err.Error())
 		for _, seconds := range seconds_to_check {
-			//t.WriteResult(fmt.Sprintf("replication_delay_lte_%d", seconds), false, fmt.Sprintf("Replication delay test (%d delay <= %d seconds)? : %s", delay, seconds, description))
-			t.WriteTextResult(fmt.Sprintf("replication_delay_lte_%d", seconds), fmt.Sprintf("down # Replication delay test (%d delay <= %d seconds)? : %s", delay, seconds, description))
+			res.AddTextResult(fmt.Sprintf("replication_delay_lte_%d", seconds), fmt.Sprintf("down # Replication delay test (%d delay <= %d seconds)? : %s", delay, seconds, description))
 		}
-
-		//t.WriteResult("replication", false, fmt.Sprintf("%s: %s", description, err.Error()))
 	} else {
 		for _, seconds := range seconds_to_check {
 			var status string
@@ -142,11 +183,12 @@ func (t *MysqlTest) RunOnce() {
 			} else {
 				status = "down"
 			}
-
-			t.WriteTextResult(fmt.Sprintf("replication_delay_lte_%d", seconds), fmt.Sprintf("%s # Replication delay test (%d delay <= %d seconds)? : %s", status, delay, seconds, description))
+			res.AddTextResult(fmt.Sprintf("replication_delay_lte_%d", seconds), fmt.Sprintf("%s # Replication delay test (%d delay <= %d seconds)? : %s", status, delay, seconds, description))
 		}
 	}
 	defer t.Disconnect()
+
+        return &res
 }
 
 func (t *MysqlTest) Disconnect() {
@@ -170,6 +212,7 @@ func (t *MysqlTest) WriteTextResult(testname string, status string) {
 	t.JsonLog(fmt.Sprintf("Test: %s result: %s", testname, status))
 	file.WriteString(status)
 }
+
 
 func (t *MysqlTest) WriteHttpResult(testname string, passed bool, description string) {
 	status := "503 Service Unavailable"
