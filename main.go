@@ -27,7 +27,8 @@ import (
   "sync"
 )
 
-const VERSION string = "0.0.2"
+// The current versoin of the app
+const VERSION string = "0.0.3"
 
 func main() {
 	// TODO: parse flags

@@ -8,6 +8,16 @@ import (
   "regexp"
 )
 
+// Start up the status server
+func Start() {
+  http.HandleFunc("/", handler)
+  //fs := http.FileServer(http.Dir("tmp"))
+  //http.Handle("/", fs)
+
+  log.Println("Listening...")
+  http.ListenAndServe(":3000", nil)
+}
+
 func check(e error) {
     if e != nil {
         panic(e)
@@ -32,13 +42,4 @@ func handler(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusServiceUnavailable)
     fmt.Fprintf(w, "%s (read %d bytes)\n", string(b1), n1)
   }
-}
-
-func Run() {
-  http.HandleFunc("/", handler)
-  //fs := http.FileServer(http.Dir("tmp"))
-  //http.Handle("/", fs)
-
-  log.Println("Listening...")
-  http.ListenAndServe(":3000", nil)
 }
