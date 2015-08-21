@@ -10,7 +10,7 @@ import (
   "github.com/haikulearning/mysql_probe/mysqltest"
 )
 
-var required_up_checks = []string{"connection_count_lte_2400", "connect"}
+var required_up_checks = []string{"connect", "connection_count_lte_2400"}
 
 type StatuServer struct {
 	reportdir     string
@@ -47,23 +47,8 @@ func (s *StatuServer) handler(w http.ResponseWriter, r *http.Request) {
   is_up := true
 
   for _,testname := range required_up_checks {
-    testpath := mysqltest.TestResultPath(s.reportdir, testname)
-    log.Println("checking " + testpath)
-
-    f, err := os.Open(testpath)
-    if err != nil {
-      is_up = false
-    } else {
-      b1 := make([]byte, 10)
-      _, err := f.Read(b1)
-      check(err)
-
-      match, err := regexp.MatchString("up", string(b1))
-      check(err)
-
-      if !match && is_up {
-        is_up = false
-      }
+    if is_up {
+      is_up = s.testResultIsUp(testname)
     }
   }
 
@@ -74,4 +59,33 @@ func (s *StatuServer) handler(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusServiceUnavailable)
     fmt.Fprintf(w, "down\n")
   }
+}
+
+func (s *StatuServer) testResultIsUp(testname string) bool {
+  testpath := mysqltest.TestResultPath(s.reportdir, testname)
+  match := false
+
+  defer func() {
+    if r := recover(); r != nil {
+      log.Println("down via failure checking " + testpath + " (skipping all subsequent checks)")
+    }
+  }()
+
+  f, err := os.Open(testpath)
+  check(err)
+
+  b1 := make([]byte, 10)
+  _, err = f.Read(b1)
+  check(err)
+
+  match, err = regexp.MatchString("up", string(b1))
+  check(err)
+
+  if match {
+    log.Println("up via " + testpath)
+  } else {
+    log.Println("down via " + testpath + " (skipping all subsequent checks)")
+  }
+
+  return match
 }
