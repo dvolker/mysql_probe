@@ -27,7 +27,7 @@ import (
   "sync"
 )
 
-// The current versoin of the app
+// The current version of the app
 const VERSION string = "0.0.3"
 
 func main() {
@@ -74,6 +74,12 @@ func main() {
 			EnvVar: "MYSQL_PROBE_REPORTS",
 		},
 		cli.IntFlag{
+			Name:   "server",
+			Value:  3001,
+			Usage:  "port number where the status server should run. Use 0 to disable status server",
+			EnvVar: "MYSQL_PROBE_SERVER",
+		},
+		cli.IntFlag{
 			Name:   "interval, i",
 			Value:  250,
 			Usage:  "interval in milliseconds to run the checks, set to 0 to only run the tests once",
@@ -110,9 +116,11 @@ func main() {
       t.Run()
     }()
 
-    log.Println("Starting status server")
-    s := statusserver.NewStatuServer(c.String("reports"), 3001)
-    s.Start()
+    if c.Int("server") > 0 {
+      log.Println("Starting status server")
+      s := statusserver.NewStatuServer(c.String("reports"), c.Int("server"))
+      s.Start()
+    }
 
     wg.Wait()
     log.Println("Finished running")
