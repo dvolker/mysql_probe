@@ -49,10 +49,19 @@ type MysqlTest struct {
 }
 
 
-func NewMysqlTest(name string, host string, port int, user string, pass string, interval int, timeout int, reportdir string, jsonlog *os.File) *MysqlTest {
-	m := MysqlTest{Name: name, host: host, port: port, user: user, pass: pass, interval: interval, timeout: timeout, reportdir: reportdir, jsonlog: jsonlog, iteration: 1}
+func RunMysqlTest(name string, host string, port int, user string, pass string, interval int, timeout int, reportdir string, jsonlog string) *MysqlTest {
 
-	return &m
+	jsonlogfile, err := os.OpenFile(jsonlog, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		panic(fmt.Sprintf("Couldn't open jsonlog \"%s\" for writing: %s", jsonlog, err.Error()))
+	}
+	defer jsonlogfile.Close()
+
+	m := MysqlTest{Name: name, host: host, port: port, user: user, pass: pass, interval: interval, timeout: timeout, reportdir: reportdir, jsonlog: jsonlogfile, iteration: 1}
+
+	m.Run()
+
+  return &m
 }
 
 func (t *MysqlTest) Run() {

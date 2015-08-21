@@ -17,7 +17,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/codegangsta/cli"
 	"github.com/haikulearning/mysql_probe/mysqltest"
 	"github.com/haikulearning/mysql_probe/statusserver"
@@ -95,15 +94,6 @@ func main() {
 	app.EnableBashCompletion = true
 	app.Action = func(c *cli.Context) {
     log.Println("Started running")
-		// setup checks to run on intervals
-
-		file, err := os.OpenFile(c.String("jsonlog"), os.O_WRONLY|os.O_CREATE, 0644)
-		if err != nil {
-			panic(fmt.Sprintf("Couldn't open jsonlog \"%s\" for writing: %s", c.String("jsonlog"), err.Error()))
-		}
-		defer file.Close()
-
-		t := mysqltest.NewMysqlTest("connection", c.String("host"), c.Int("port"), c.String("user"), c.String("pass"), c.Int("interval"), c.Int("timeout"), c.String("reports"), file)
 
     var wg sync.WaitGroup
     wg.Add(1)
@@ -112,8 +102,8 @@ func main() {
     go func() {
       // Decrement the counter when the goroutine completes.
       defer wg.Done()
-      // Run our tests
-      t.Run()
+      // Run our mysql tests
+      mysqltest.RunMysqlTest("connection", c.String("host"), c.Int("port"), c.String("user"), c.String("pass"), c.Int("interval"), c.Int("timeout"), c.String("reports"), c.String("jsonlog"))
     }()
 
     if c.Int("server") > 0 {
