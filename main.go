@@ -108,8 +108,7 @@ func main() {
 
     if c.Int("server") > 0 {
       log.Println("Starting status server")
-      s := statusserver.NewStatuServer(c.String("reports"), c.Int("server"))
-      s.Start()
+      statusserver.StartStatuServer(c.String("reports"), c.Int("server"))
     }
 
     wg.Wait()

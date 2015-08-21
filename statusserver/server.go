@@ -14,8 +14,10 @@ type StatuServer struct {
 	port          int
 }
 
-func NewStatuServer(reportdir string, port int) *StatuServer {
+func StartStatuServer(reportdir string, port int) *StatuServer {
 	s := StatuServer{reportdir: reportdir, port: port}
+
+  s.Start()
 
 	return &s
 }
