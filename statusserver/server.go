@@ -7,7 +7,10 @@ import (
   "net/http"
   "os"
   "regexp"
+  "github.com/haikulearning/mysql_probe/mysqltest"
 )
+
+var required_up_checks = []string{"connection_count_lte_2400", "connect"}
 
 type StatuServer struct {
 	reportdir     string
@@ -24,7 +27,9 @@ func StartStatuServer(reportdir string, port int) *StatuServer {
 
 // Start up the status server
 func (s *StatuServer) Start() {
-  http.HandleFunc("/", handler)
+  http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+    s.handler(w, r)
+  })
   //fs := http.FileServer(http.Dir("tmp"))
   //http.Handle("/", fs)
 
@@ -38,22 +43,35 @@ func check(e error) {
     }
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
-  f, err := os.Open(r.URL.Path[1:])
-  check(err)
+func (s *StatuServer) handler(w http.ResponseWriter, r *http.Request) {
+  is_up := true
 
-  b1 := make([]byte, 10)
-  n1, err := f.Read(b1)
-  check(err)
+  for _,testname := range required_up_checks {
+    testpath := mysqltest.TestResultPath(s.reportdir, testname)
+    log.Println("checking " + testpath)
 
-  match, err := regexp.MatchString("up", string(b1))
-  check(err)
+    f, err := os.Open(testpath)
+    if err != nil {
+      is_up = false
+    } else {
+      b1 := make([]byte, 10)
+      _, err := f.Read(b1)
+      check(err)
 
-  if match {
+      match, err := regexp.MatchString("up", string(b1))
+      check(err)
+
+      if !match && is_up {
+        is_up = false
+      }
+    }
+  }
+
+  if is_up {
     w.WriteHeader(http.StatusOK)
-    fmt.Fprintf(w, "%s (read %d bytes)\n", string(b1), n1)
+    fmt.Fprintf(w, "up\n")
   } else {
     w.WriteHeader(http.StatusServiceUnavailable)
-    fmt.Fprintf(w, "%s (read %d bytes)\n", string(b1), n1)
+    fmt.Fprintf(w, "down\n")
   }
 }
