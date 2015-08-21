@@ -111,7 +111,8 @@ func main() {
     }()
 
     log.Println("Starting status server")
-    statusserver.Run()
+    s := statusserver.NewStatuServer(c.String("reports"), 3001)
+    s.Start()
 
     wg.Wait()
     log.Println("Finished running")

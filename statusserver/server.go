@@ -1,6 +1,7 @@
 package statusserver
 
 import (
+  "strconv"
   "fmt"
   "log"
   "net/http"
@@ -8,14 +9,25 @@ import (
   "regexp"
 )
 
+type StatuServer struct {
+	reportdir     string
+	port          int
+}
+
+func NewStatuServer(reportdir string, port int) *StatuServer {
+	s := StatuServer{reportdir: reportdir, port: port}
+
+	return &s
+}
+
 // Start up the status server
-func Start() {
+func (s *StatuServer) Start() {
   http.HandleFunc("/", handler)
   //fs := http.FileServer(http.Dir("tmp"))
   //http.Handle("/", fs)
 
-  log.Println("Listening...")
-  http.ListenAndServe(":3000", nil)
+  log.Println("Listening to port " + strconv.Itoa(s.port))
+  http.ListenAndServe(":" + strconv.Itoa(s.port), nil)
 }
 
 func check(e error) {

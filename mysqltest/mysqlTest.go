@@ -35,7 +35,7 @@ var seconds_to_check = []int64{0, 10, 30, 60, 120, 300, 600, 1200, 2400}
 
 type MysqlTest struct {
 	Name          string
-	filedirectory string
+	reportdir     string
 	host          string
 	user          string
 	port          int
@@ -49,8 +49,8 @@ type MysqlTest struct {
 }
 
 
-func NewMysqlTest(name string, host string, port int, user string, pass string, interval int, timeout int, filedirectory string, jsonlog *os.File) *MysqlTest {
-	m := MysqlTest{Name: name, host: host, port: port, user: user, pass: pass, interval: interval, timeout: timeout, filedirectory: filedirectory, jsonlog: jsonlog, iteration: 1}
+func NewMysqlTest(name string, host string, port int, user string, pass string, interval int, timeout int, reportdir string, jsonlog *os.File) *MysqlTest {
+	m := MysqlTest{Name: name, host: host, port: port, user: user, pass: pass, interval: interval, timeout: timeout, reportdir: reportdir, jsonlog: jsonlog, iteration: 1}
 
 	return &m
 }
@@ -98,7 +98,7 @@ func (t *MysqlTest) GetWeight(val int64, max int64) string {
 	return fmt.Sprintf("%d%%", 100-(100*(val/max)))
 }
 
-// func writeHttpResult(filedirectory string) {
+// func writeHttpResult(reportdir string) {
 //
 // }
 
@@ -106,7 +106,7 @@ func (t *MysqlTest) RunOnceWithTimeout() *MysqlTestResult {
   timeout_ch := make(chan *MysqlTestResult, 1)
   ch := make(chan *MysqlTestResult, 1)
 
-  // after 1 second, fill a blank response and 
+  // after 1 second, fill a blank response and
   // send that indicates everything timed out
   go func() {
     time.Sleep(time.Duration(t.timeout) * time.Millisecond)
@@ -199,7 +199,7 @@ func (t *MysqlTest) Disconnect() {
 }
 
 func (t *MysqlTest) WriteTextResult(testname string, status string) {
-	path := fmt.Sprintf("%s.agent.txt", filepath.Join(t.filedirectory, "/", testname))
+	path := fmt.Sprintf("%s.agent.txt", filepath.Join(t.reportdir, "/", testname))
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		//log.Fatal(err)
@@ -222,7 +222,7 @@ func (t *MysqlTest) WriteHttpResult(testname string, passed bool, description st
 	now := time.Now().Format(time.RFC1123Z)
 	response := fmt.Sprintf("HTTP/1.1 %s\r\nDate: %s\r\nContent-Type: text/plain\r\n\r\n%s\r\n", status, now, description)
 
-	path := fmt.Sprintf("%s.http.txt", filepath.Join(t.filedirectory, "/", testname))
+	path := fmt.Sprintf("%s.http.txt", filepath.Join(t.reportdir, "/", testname))
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		//log.Fatal(err)
