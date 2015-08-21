@@ -51,7 +51,7 @@ type MysqlTest struct {
 
 func RunMysqlTest(name string, host string, port int, user string, pass string, interval int, timeout int, reportdir string, jsonlog string) *MysqlTest {
 
-	jsonlogfile, err := os.OpenFile(jsonlog, os.O_CREATE|os.O_WRONLY, 0644)
+	jsonlogfile, err := os.OpenFile(jsonlog, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		panic(fmt.Sprintf("Couldn't open jsonlog \"%s\" for writing: %s", jsonlog, err.Error()))
 	}
