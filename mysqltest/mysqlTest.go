@@ -18,7 +18,6 @@ package mysqltest
 
 import (
 	"database/sql"
-	//"encoding/json"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	//"log"
@@ -90,12 +89,6 @@ func (t *MysqlTest) WriteResult(res * MysqlTestResult) {
 // pass it in as a map[string]interface{} and then detect value as int, string, w/e
 // before marshaling json.
 func (t *MysqlTest) JsonLog(msg string) {
-	//t.logger.Println(json.Marshal(t))
-	//buf, err := json.Marshal(v)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//t.jsonlog.Write(buf)
 	t.jsonlog.WriteString(fmt.Sprintf("{\"@timestamp\":\"%s\",\"type\":\"mysql_probe\",\"host\":\"%s\",\"iteration\":%v,\"message\":\"%s\"}\n",
 		time.Now().Format(time.RFC3339), t.host, t.iteration, msg))
 }
@@ -106,10 +99,6 @@ func (t *MysqlTest) GetWeight(val int64, max int64) string {
 	}
 	return fmt.Sprintf("%d%%", 100-(100*(val/max)))
 }
-
-// func writeHttpResult(reportdir string) {
-//
-// }
 
 func (t *MysqlTest) RunOnceWithTimeout() *MysqlTestResult {
   timeout_ch := make(chan *MysqlTestResult, 1)
