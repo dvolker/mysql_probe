@@ -63,22 +63,14 @@ func (t *MysqlTest) Run() {
 	if t.interval < 0 {
 		panic("interval must be a positive integer, or 0 to run the tests only once.")
 	}
-	t.WriteResult(t.RunOnceWithTimeout()) // Run first test instantly.
+	t.RunOnceWithTimeout() // Run first test instantly.
 	if t.interval > 0 {
 		// run checks on intervals
 		for _ = range time.Tick(time.Duration(t.interval) * time.Millisecond) {
 			t.iteration++ // when this overflows it will become 0 with no problems http://play.golang.org/p/fbjwHKcIaU
-			t.WriteResult(t.RunOnceWithTimeout())
+			t.RunOnceWithTimeout()
 		}
 	}
-}
-
-
-// takes the MysqlTestResult and writes corresponding files
-func (t *MysqlTest) WriteResult(res * MysqlTestResult) {
-  for k,v := range res.Entries {
-    t.WriteTextResult(k,v)
-  }
 }
 
 // This is a very dumb json func. If more interesting stuff needs to be logged,
@@ -96,7 +88,7 @@ func (t *MysqlTest) GetWeight(val int64, max int64) string {
 	return fmt.Sprintf("%d%%", 100-(100*(val/max)))
 }
 
-func (t *MysqlTest) RunOnceWithTimeout() *MysqlTestResult {
+func (t *MysqlTest) RunOnceWithTimeout() {
   timeout_ch := make(chan *MysqlTestResult, 1)
   ch := make(chan *MysqlTestResult, 1)
 
@@ -129,7 +121,9 @@ func (t *MysqlTest) RunOnceWithTimeout() *MysqlTestResult {
   case res = <-ch:
   case res = <-timeout_ch:
   }
-  return res
+
+  writer := MysqlTestResultWriter{test: t, result: res}
+  writer.WriteResult()
 }
 
 func (t *MysqlTest) RunOnce() *MysqlTestResult {
@@ -182,7 +176,7 @@ func (t *MysqlTest) RunOnce() *MysqlTestResult {
 	}
 	defer t.Disconnect()
 
-        return &res
+  return &res
 }
 
 func (t *MysqlTest) Disconnect() {

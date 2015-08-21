@@ -6,22 +6,35 @@ import (
 	"path/filepath"
 )
 
+type MysqlTestResultWriter struct {
+  test    *MysqlTest
+  result  *MysqlTestResult
+}
+
 func TestResultPath(reportdir string, testname string) string {
   return fmt.Sprintf("%s.agent.txt", filepath.Join(reportdir, "/", testname))
 }
 
-func (t *MysqlTest) WriteTextResult(testname string, status string) {
-	path := TestResultPath(t.reportdir, testname)
+// writes corresponding files for each test result entry
+func (tw *MysqlTestResultWriter) WriteResult() {
+  for k,v := range tw.result.Entries {
+    tw.WriteTextResult(k,v)
+  }
+}
+
+// write an individual test result into to a text file
+func (tw *MysqlTestResultWriter) WriteTextResult(testname string, status string) {
+	path := TestResultPath(tw.test.reportdir, testname)
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		//log.Fatal(err)
 		desc := fmt.Sprintf("Couldn't open result file \"%s\": ", err.Error())
-		t.JsonLog(desc)
+		tw.test.JsonLog(desc)
 		os.Stderr.WriteString(desc)
 		return
 	}
 	defer file.Close()
-	t.JsonLog(fmt.Sprintf("Test: %s result: %s", testname, status))
+	tw.test.JsonLog(fmt.Sprintf("Test: %s result: %s", testname, status))
 	file.WriteString(status)
 }
 
@@ -38,11 +51,11 @@ func (t *MysqlTest) WriteTextResult(testname string, status string) {
 //	if err != nil {
 //		//log.Fatal(err)
 //		desc := fmt.Sprintf("Couldn't open result file \"%s\": ", err.Error())
-//		t.JsonLog(desc)
+//		tw.test.JsonLog(desc)
 //		os.Stderr.WriteString(desc)
 //		return
 //	}
 //	defer file.Close()
-//	t.JsonLog(fmt.Sprintf("Test: %s result: %v: %s", testname, passed, description))
+//	tw.test.JsonLog(fmt.Sprintf("Test: %s result: %v: %s", testname, passed, description))
 //	file.WriteString(response)
 //}
