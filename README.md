@@ -1,81 +1,66 @@
-mysql probe
-==========
-golang application that checks a mysql database and creates a series of HTTP responses stored as
-flat text files that xinetd can return quickly for haproxy health checks.
+# mysql probe
+
+A golang application that checks a mysql database and creates a series of HTTP responses stored as flat text files that xinetd can return quickly for haproxy health checks.
 
 ## Installation
-Install golang 1.3+ and run ./build which will compile to bin/mysql_probe.
+
+1. Install golang 1.3+
+2. `go get github.com/haikulearning/mysql_probe`
 
 ### MySQL configuration
-A user must be created with the following perms:
-PROCESS
-REPLICATION CLIENT
-like such:
+
+Create a MySQL user with the following permissions:
+* PROCESS
+* REPLICATION CLIENT
+
+For example:
+
+````sql
 CREATE USER mysql_probe@'%' IDENTIFIED BY 'As92rj05UvKK';
 GRANT PROCESS,REPLICATION CLIENT ON *.* TO mysql_probe@'%';
-
-
-## Create package for distribution
-Install fpm and run ./package https://github.com/jordansissel/fpm
-
-## Configuration
-Edit /etc/mysqlprobe/config.yaml
+````
 
 ## Running
+
 mysql_probe --help will provide available options.
 
-## Checks
-Checks can be named and run at configured intervals. Each check can 'roll up' multiple checks and
-return an alarm if any of the checks fail.
-### Global check options
-These options apply to an entire instance of mysql_probe.
-host: hostname to connect to
-user: user to login to mysql with
-pass: password to login to mysql with
-interval: seconds to wait before rerunning this check. This is calculated as starting when the previous check has finished to prevent pileups.
+### Checks
 
-### Individual check options
-name: display name of this check. must be unique.
-type: required check name
-result_files: a list of files to place this result as http responses in text
+For now, a default set of checks are hard-coded to run:
+* "Connection Count Less Than X" with the following values:
+  * 1, 10, 50, 100, 150, 200, 250, 300, 600, 1200, 2400
+* "Replication Delay Less Than X" with the following values (in seconds):
+  * 0, 10, 30, 60, 120, 300, 600, 1200, 2400
 
-### replication_delay
-Checks that replication is not delayed over configured seconds.
-#### Options
-max_delay: in seconds, if replication delayed > this number, consider check failed.
+### haproxy Configuration Example
+TOOD: Add an example haproxy config using these checks to build a resilient failover configuration.
 
-### connection_count
-Count the existing connections to this server and fail if connection count is too great.
-#### Options
-max_connections: if there are more than this many connections to the server, fail
+### xinetd Configuration Example
+TODO: Add an example of using xinetd to return these http txt files as http requests.
 
-### assert
-Run a query that returns a number and compare the results
-#### Options
-query: query to run
-fail_if_gt: compare the numeric result of query and fail if the returned value is greater than this number.
-fail_if_lt: compare the numeric result of query and fail if the returned value is less than this number.
+## Development
 
-## Development phases
-1. Build checks with completely hardcoded configuration to check localhost.
-2. Build configuration parser so this app does not need to be recompiled every time config changes.
-3. Build rollup checks into configuration.
-
-## Phase 1 hardcoded config
-Check config.go for hardcoded values, host, username, password.
-Run replcation_delay check and output to /var/run/mysql_probe/replcation_delay.http.txt
-Run connection_count check and output to /var/run/mysql_probe/connection_count.http.txt
+````bash
+$ get go -u github.com/haikulearning/mysql_probe
+$ cd $GOPATH/src/github.com/haikulearning/mysql_probe
+$ make
+````
 
 ## Testing
 A dockerfile is available in docker/test for spinning up an instance of this app.
 
-## haproxy Configuration Example
-TOOD: Add an example haproxy config using these checks to build a resilient failover configuration.
+## Roadmap
+1. Build checks with completely hardcoded configuration to check localhost.
+2. Build configuration parser so this app does not need to be recompiled every time config changes.
+3. Build rollup checks into configuration.
 
-## xinetd Configuration Example
-TODO: Add an example of using xinetd to return these http txt files as http requests.
+### Phase 1 hardcoded config
+Check config.go for hardcoded values, host, username, password.
+Run replcation_delay check and output to /var/run/mysql_probe/replcation_delay.http.txt
+Run connection_count check and output to /var/run/mysql_probe/connection_count.http.txt
 
 ## Copyright
+
 Copyright 2014 Derek Volker
 
 Licensed under the Apache License, Version 2.0 (the "License");
