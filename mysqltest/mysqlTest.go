@@ -18,14 +18,9 @@ package mysqltest
 
 import (
 	"database/sql"
-	//"encoding/json"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
-	//"log"
-	//"io"
 	"os"
-	"path/filepath"
-	//"reflect"
 	"errors"
 	"time"
 )
@@ -35,7 +30,7 @@ var seconds_to_check = []int64{0, 10, 30, 60, 120, 300, 600, 1200, 2400}
 
 type MysqlTest struct {
 	Name          string
-	filedirectory string
+	reportdir     string
 	host          string
 	user          string
 	port          int
@@ -49,44 +44,39 @@ type MysqlTest struct {
 }
 
 
-func NewMysqlTest(name string, host string, port int, user string, pass string, interval int, timeout int, filedirectory string, jsonlog *os.File) *MysqlTest {
-	m := MysqlTest{Name: name, host: host, port: port, user: user, pass: pass, interval: interval, timeout: timeout, filedirectory: filedirectory, jsonlog: jsonlog, iteration: 1}
+func RunMysqlTest(name string, host string, port int, user string, pass string, interval int, timeout int, reportdir string, jsonlog string) *MysqlTest {
 
-	return &m
+	jsonlogfile, err := os.OpenFile(jsonlog, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		panic(fmt.Sprintf("Couldn't open jsonlog \"%s\" for writing: %s", jsonlog, err.Error()))
+	}
+	defer jsonlogfile.Close()
+
+	m := MysqlTest{Name: name, host: host, port: port, user: user, pass: pass, interval: interval, timeout: timeout, reportdir: reportdir, jsonlog: jsonlogfile, iteration: 1}
+
+	m.Run()
+
+  return &m
 }
 
 func (t *MysqlTest) Run() {
 	if t.interval < 0 {
 		panic("interval must be a positive integer, or 0 to run the tests only once.")
 	}
-	t.WriteResult(t.RunOnceWithTimeout()) // Run first test instantly.
+	t.RunOnceWithTimeout() // Run first test instantly.
 	if t.interval > 0 {
 		// run checks on intervals
 		for _ = range time.Tick(time.Duration(t.interval) * time.Millisecond) {
 			t.iteration++ // when this overflows it will become 0 with no problems http://play.golang.org/p/fbjwHKcIaU
-			t.WriteResult(t.RunOnceWithTimeout())
+			t.RunOnceWithTimeout()
 		}
 	}
-}
-
-
-// takes the MysqlTestResult and writes corresponding files
-func (t *MysqlTest) WriteResult(res * MysqlTestResult) {
-  for k,v := range res.Entries {
-    t.WriteTextResult(k,v)
-  }
 }
 
 // This is a very dumb json func. If more interesting stuff needs to be logged,
 // pass it in as a map[string]interface{} and then detect value as int, string, w/e
 // before marshaling json.
 func (t *MysqlTest) JsonLog(msg string) {
-	//t.logger.Println(json.Marshal(t))
-	//buf, err := json.Marshal(v)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//t.jsonlog.Write(buf)
 	t.jsonlog.WriteString(fmt.Sprintf("{\"@timestamp\":\"%s\",\"type\":\"mysql_probe\",\"host\":\"%s\",\"iteration\":%v,\"message\":\"%s\"}\n",
 		time.Now().Format(time.RFC3339), t.host, t.iteration, msg))
 }
@@ -98,15 +88,11 @@ func (t *MysqlTest) GetWeight(val int64, max int64) string {
 	return fmt.Sprintf("%d%%", 100-(100*(val/max)))
 }
 
-// func writeHttpResult(filedirectory string) {
-//
-// }
-
-func (t *MysqlTest) RunOnceWithTimeout() *MysqlTestResult {
+func (t *MysqlTest) RunOnceWithTimeout() {
   timeout_ch := make(chan *MysqlTestResult, 1)
   ch := make(chan *MysqlTestResult, 1)
 
-  // after 1 second, fill a blank response and 
+  // after 1 second, fill a blank response and
   // send that indicates everything timed out
   go func() {
     time.Sleep(time.Duration(t.timeout) * time.Millisecond)
@@ -135,7 +121,9 @@ func (t *MysqlTest) RunOnceWithTimeout() *MysqlTestResult {
   case res = <-ch:
   case res = <-timeout_ch:
   }
-  return res
+
+  writer := MysqlTestResultWriter{test: t, result: res}
+  writer.WriteResult()
 }
 
 func (t *MysqlTest) RunOnce() *MysqlTestResult {
@@ -188,7 +176,7 @@ func (t *MysqlTest) RunOnce() *MysqlTestResult {
 	}
 	defer t.Disconnect()
 
-        return &res
+  return &res
 }
 
 func (t *MysqlTest) Disconnect() {
@@ -196,44 +184,6 @@ func (t *MysqlTest) Disconnect() {
 	if t.db != nil {
 		t.db.Close()
 	}
-}
-
-func (t *MysqlTest) WriteTextResult(testname string, status string) {
-	path := fmt.Sprintf("%s.agent.txt", filepath.Join(t.filedirectory, "/", testname))
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		//log.Fatal(err)
-		desc := fmt.Sprintf("Couldn't open result file \"%s\": ", err.Error())
-		t.JsonLog(desc)
-		os.Stderr.WriteString(desc)
-		return
-	}
-	defer file.Close()
-	t.JsonLog(fmt.Sprintf("Test: %s result: %s", testname, status))
-	file.WriteString(status)
-}
-
-
-func (t *MysqlTest) WriteHttpResult(testname string, passed bool, description string) {
-	status := "503 Service Unavailable"
-	if passed {
-		status = "200 OK"
-	}
-	now := time.Now().Format(time.RFC1123Z)
-	response := fmt.Sprintf("HTTP/1.1 %s\r\nDate: %s\r\nContent-Type: text/plain\r\n\r\n%s\r\n", status, now, description)
-
-	path := fmt.Sprintf("%s.http.txt", filepath.Join(t.filedirectory, "/", testname))
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		//log.Fatal(err)
-		desc := fmt.Sprintf("Couldn't open result file \"%s\": ", err.Error())
-		t.JsonLog(desc)
-		os.Stderr.WriteString(desc)
-		return
-	}
-	defer file.Close()
-	t.JsonLog(fmt.Sprintf("Test: %s result: %v: %s", testname, passed, description))
-	file.WriteString(response)
 }
 
 // NOTE: only works if one master
