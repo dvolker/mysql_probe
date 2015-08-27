@@ -64,7 +64,7 @@ func test_and_serve(c *cli.Context) {
 func main() {
 	app := cli.NewApp()
 	app.Name = "mysql_probe"
-	app.Usage = "test mysql health and write out http txt responses"
+	app.Usage = "test mysql health, write the results to disk, and serve them via http"
 	app.Version = VERSION
 
   test_mysql_flags := []cli.Flag{
