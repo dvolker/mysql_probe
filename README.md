@@ -1,6 +1,6 @@
 # mysql probe
 
-A golang application that checks a mysql database and creates a series of HTTP responses stored as flat text files that xinetd can return quickly for haproxy health checks.
+A golang application that checks a mysql database, writing results to flat files and/or runs an HTTP server for haproxy health checks based on those checks
 
 ## Installation
 
@@ -22,7 +22,10 @@ GRANT PROCESS,REPLICATION CLIENT ON *.* TO mysql_probe@'%';
 
 ## Running
 
-mysql_probe --help will provide available options.
+````
+$ mysql_probe --help # will provide available commands & flags.
+$ mysql_probe start  # will both test mysql and run the HTTP status server.
+````
 
 ### Checks
 
