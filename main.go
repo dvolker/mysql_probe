@@ -27,7 +27,7 @@ import (
 )
 
 // The current version of the app
-const VERSION string = "0.0.3"
+const VERSION string = "0.1.0"
 
 func test_mysql(c *cli.Context) {
   log.Println("Testing mysql server")
